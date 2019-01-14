@@ -2,6 +2,6 @@
 
 # Metis - Weeks 2-3 Webscraping/Regression Project:
 
-## Maxwell Clarke's Repository for Project Luther
+__Maxwell Clarke's Repository for Project Luther__
 
-## Current Status:  Exploratory/Brainstorming
+__Current Status:  Exploratory/Brainstorming__
