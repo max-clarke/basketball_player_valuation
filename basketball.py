@@ -1,12 +1,16 @@
 #!/#!/usr/bin/env python3
 
 import requests
+import pickle
+import time
 import pandas as pd
+
 
 from bs4 import BeautifulSoup
 
 
 def get_tables(url):
+    """Return table from basketball-reference.com"""
 
     response = requests.get(url)
     soup = BeautifulSoup(response.text, 'lxml')
@@ -17,13 +21,16 @@ def get_tables(url):
 
     tables = []
 
-    for roi in macaroni:
+    for roi in macaroni:  # roi = region of interest
+
         table = BeautifulSoup(roi, 'lxml').find_all('table')
-        if table != []:
+
+        if table != []:  # make sure that the roi contained a table
             tables.append(table[0])
 
     dfs = []
 
+    # convert table from html to list of lists to pd.DataFrame
     for table in tables:
         rows = table.find_all('tr')
         data = []
@@ -42,6 +49,100 @@ def get_tables(url):
         dfs.append(pd.DataFrame(data))
 
     return dfs
+
+def get_teams_for_year(year=1999):
+    """Returns list of active team abbreviations in NBA for given year""" 
+
+    #  WARNING: have not tested on years other than 1999
+
+    url = 'https://www.basketball-reference.com/leagues/NBA_{}.html'.format(year)
+    page = requests.get(url)
+    soup = BeautifulSoup(page.text, 'lxml')
+
+    # this gets a list of the all teams in the nba
+    trs = soup.find_all('tr')
+
+    team_links = []
+    teams = []
+
+    for tr in trs:
+        if tr.a:
+            link = tr.a['href'].strip('/teams/').strip('/')
+            team_links.append(link)
+            teams.append(link.strip('/{}.html'.format(year)))
+
+    return teams, team_links
+
+
+def get_database(year=1999):
+
+    teams, team_links = get_teams_for_year(year)
+
+    urls = ['https://www.basketball-reference.com/teams/{}'.format(link) for link in team_links]
+
+    database = {}
+
+    for url, team in zip(urls, teams):
+    
+        database[team] = get_tables(url)
+
+    return database
+
+def database_to_36min_and_salaries():
+    
+    database = get_database()
+
+    dfs_per_36 = {}
+
+    for team, dfs in database.items():
+        clean_df = dfs[6].copy()  # the 6th table is always the per36 stats
+        clean_df.iloc[0,1] = 'Name'
+        clean_df.columns = clean_df.iloc[0,:]
+        clean_df.drop(0, inplace=True)
+        clean_df.reset_index(inplace=True, drop=True)
+        dfs_per_36[team] = clean_df
+
+
+    salaries = {}
+
+    for team, dfs in database.items():
+        new_df = dfs[-1].copy()  # the salary table is the last on the page
+        new_df.iloc[0,1] = 'Name'  # fill in blank column name
+        new_df.columns = new_df.iloc[0, :]
+        new_df.drop(0, inplace=True)
+        new_df.reset_index(inplace=True, drop=True)
+        
+        # money to float
+        new_df['Salary'].replace('\D', '', regex=True, inplace=True)
+        new_df['Salary'] = pd.to_numeric(new_df['Salary'])
+
+        # add to dicitonary
+        salaries[team] = new_df
+
+    return dfs_per_36, salaries
+
+
+def stats_salary_join():
+
+    dfs, targets = database_to_36min_and_salaries()
+
+    data = []
+
+    for team in dfs.keys():
+        df = dfs[team]
+        sal = targets[team]
+        sal.drop('Rk', axis=1, inplace=True)
+        new_df = pd.concat([df.set_index('Name'), sal.set_index('Name')], axis=1, join='inner')
+        data.append(new_df)
+
+    final_df = pd.concat(data)
+    final_df = final_df.apply(pd.to_numeric) # the per36 tables weren't numeric yet
+
+    return final_df
+
+
+
+
 
 
 # commenting out the below because I don't need every single table
@@ -89,7 +190,9 @@ def get_tables(url):
 if __name__ == '__main__':
 
     # testing on just one team, one season
-    URL = 'https://www.basketball-reference.com/teams/SAS/1999.html'
-    dfs = get_tables(URL)
+    df = stats_salary_join()
+    
+    with open('final_df.pickle', 'wb') as f:
+        pickle.dump(df, f)
 
-    print(dfs[9])
+    print(df.sample(5))
