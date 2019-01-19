@@ -76,7 +76,7 @@ def get_teams_for_year(year=1999):
 
 def get_database(year=1999):
 
-    teams, team_links = get_teams_for_year(year)
+    teams, team_links = get_teams_for_year(year=year)
 
     urls = ['https://www.basketball-reference.com/teams/{}'.format(link) for link in team_links]
 
@@ -88,9 +88,10 @@ def get_database(year=1999):
 
     return database
 
-def database_to_36min_and_salaries():
+def database_to_36min_and_salaries(year=1999, database=None):
     
-    database = get_database()
+    if database == None: # want to allow a database to be passed
+        database = get_database(year)
 
     dfs_per_36 = {}
 
@@ -122,9 +123,12 @@ def database_to_36min_and_salaries():
     return dfs_per_36, salaries
 
 
-def stats_salary_join():
+def stats_salary_join(year=None, dfs=None, targets=None):
+    "merges per36min table and salary for all teams in a year and returns resulting DataFrame"
 
-    dfs, targets = database_to_36min_and_salaries()
+    if ((dfs == None) | (targets == None) | (year == None)):
+        dfs, targets = database_to_36min_and_salaries(year=1999)
+        year = 1999
 
     data = []
 
@@ -133,12 +137,65 @@ def stats_salary_join():
         sal = targets[team]
         sal.drop('Rk', axis=1, inplace=True)
         new_df = pd.concat([df.set_index('Name'), sal.set_index('Name')], axis=1, join='inner')
+        new_df['Team'] = team
+        new_df['Year'] = year
+        new_df.reset_index(inplace=True)
+        new_df.set_index(['Name', 'Team', 'Year'], inplace=True)
         data.append(new_df)
 
     final_df = pd.concat(data)
     final_df = final_df.apply(pd.to_numeric) # the per36 tables weren't numeric yet
 
     return final_df
+
+# this next one didn't really work
+def get_multiple_years(start=2008, end=2018):
+
+    dfs = []
+    for year in range(start, end + 1):
+
+        # this try-except is untested. It would take 10 min so I don't want to right now
+        try:
+            df = stats_salary_join(year)
+        except ValueError:
+            continue
+        dfs.append(df)
+
+    return pd.concat(dfs)
+
+
+def clean_columns(df):
+    """Cleans some rows and adds a feature. The mapper is to make those features available
+    for stats models."""
+    
+    mapper = {'2P':'TwoPoint',
+              '2PA':'TwoPointAttempt',
+              '2P%':'TwoPointPercent',
+              'FG%': 'FieldGoalPercent',
+              'FT%':'FreeThrowPercent',
+              '3P%': 'ThreePointPercent'
+         }
+
+    df.rename(columns=mapper, inplace=True)
+
+    preliminary_columns = ['DRB', 'TwoPoint', 'PTS', 'FG', 'BLK', 'FT',
+                           'TwoPointAttempt', 'Age', 'PF', 'Salary']
+
+    to_remove = ['Salary', 'FreeThrowPercent', 'ThreePointPercent',
+                 'TwoPointPercent', 'FieldGoalPercent']
+
+    columns = list(df.columns)
+    for column in to_remove:
+        columns.remove(column)
+
+    # let's drop players with low minutes played per game, say less than 10
+    df['MPperG'] = df['MP']/df['G']
+
+    mask = (df['MPperG'] > 10)
+    df_over_10 = df[mask]
+    
+    return
+
 
 
 
