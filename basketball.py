@@ -4,6 +4,7 @@ import requests
 import pickle
 import time
 import pandas as pd
+import numpy as np
 
 
 from bs4 import BeautifulSoup
@@ -51,7 +52,7 @@ def get_tables(url):
     return dfs
 
 def get_teams_for_year(year=1999):
-    """Returns list of active team abbreviations in NBA for given year""" 
+    """Returns list of active team abbreviations in NBA for given year"""
 
     #  WARNING: have not tested on years other than 1999
 
@@ -83,20 +84,26 @@ def get_database(year=1999):
     database = {}
 
     for url, team in zip(urls, teams):
-    
+
         database[team] = get_tables(url)
 
     return database
 
-def database_to_36min_and_salaries(year=1999, database=None):
-    
+def database_to_stats_and_salaries(pos=6, year=1999, database=None):
+    """
+    Take database and returns specific stats table and salary tables
+    for pos (position) argument:
+        6 --> per 36 minute table
+        8 --> advanced stats table
+    """
+
     if database == None: # want to allow a database to be passed
         database = get_database(year)
 
     dfs_per_36 = {}
 
     for team, dfs in database.items():
-        clean_df = dfs[6].copy()  # the 6th table is always the per36 stats
+        clean_df = dfs[pos].copy()  # the 6th table is always the per36 stats
         clean_df.iloc[0,1] = 'Name'
         clean_df.columns = clean_df.iloc[0,:]
         clean_df.drop(0, inplace=True)
@@ -112,7 +119,7 @@ def database_to_36min_and_salaries(year=1999, database=None):
         new_df.columns = new_df.iloc[0, :]
         new_df.drop(0, inplace=True)
         new_df.reset_index(inplace=True, drop=True)
-        
+
         # money to float
         new_df['Salary'].replace('\D', '', regex=True, inplace=True)
         new_df['Salary'] = pd.to_numeric(new_df['Salary'])
@@ -167,7 +174,7 @@ def get_multiple_years(start=2008, end=2018):
 def clean_columns(df):
     """Cleans some rows and adds a feature. The mapper is to make those features available
     for stats models."""
-    
+
     mapper = {'2P':'TwoPoint',
               '2PA':'TwoPointAttempt',
               '2P%':'TwoPointPercent',
@@ -193,10 +200,42 @@ def clean_columns(df):
 
     mask = (df['MPperG'] > 10)
     df_over_10 = df[mask]
-    
-    return
+
+    return df_over_10
 
 
+def prepare_dataframe(df):
+
+    mapper = {
+        '2P': 'TwoPoint',
+        '2PA': 'TwoPointAttempt',
+        '2P%': 'TwoPointPercent',
+        'FG%': 'FieldGoalPercent',
+        'FT%': 'FreeThrowPercent',
+        '3P%': 'ThreePointPercent'
+    }
+
+    df.rename(columns=mapper, inplace=True)
+
+    to_remove = ['Salary', 'FreeThrowPercent', 'ThreePointPercent',
+                 'TwoPointPercent', 'FieldGoalPercent']
+
+    columns = list(df.columns)
+    for column in to_remove:
+        columns.remove(column)
+
+    # let's drop players with low minutes played per game, say less than 10
+    df['MPperG'] = df['MP'] / df['G']
+
+    # We want over 10 minutes played per game and nonzero salary
+    mask = ((df['MPperG'] > 10) & (df['Salary'] > 0))
+    df = df[mask]
+
+    X = df[columns].values
+    y = df['Salary'].values
+    y = np.log(y)
+
+    return X, y, df
 
 
 
@@ -248,7 +287,7 @@ if __name__ == '__main__':
 
     # testing on just one team, one season
     df = stats_salary_join()
-    
+
     with open('final_df.pickle', 'wb') as f:
         pickle.dump(df, f)
 
