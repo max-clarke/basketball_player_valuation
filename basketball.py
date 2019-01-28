@@ -143,7 +143,11 @@ def stats_salary_join(year=None, dfs=None, targets=None):
         df = dfs[team]
         sal = targets[team]
         sal.drop('Rk', axis=1, inplace=True)
-        new_df = pd.concat([df.set_index('Name'), sal.set_index('Name')], axis=1, join='inner')
+        try:
+            new_df = pd.concat([df.set_index('Name'), sal.set_index('Name')], axis=1, join='inner')
+        except ValueError:
+            print('Failed to concat {}'.format(team))
+            continue
         new_df['Team'] = team
         new_df['Year'] = year
         new_df.reset_index(inplace=True)
