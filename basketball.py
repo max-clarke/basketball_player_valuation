@@ -1,4 +1,4 @@
-#!/#!/usr/bin/env python3
+#!/usr/bin/env python3
 
 import requests
 import pickle
@@ -82,12 +82,11 @@ def get_database(year=1999):
     urls = ['https://www.basketball-reference.com/teams/{}'.format(link) for link in team_links]
 
     database = {}
-
     for url, team in zip(urls, teams):
-
         database[team] = get_tables(url)
 
     return database
+
 
 def database_to_stats_and_salaries(pos=6, year=1999, database=None):
     """
@@ -240,51 +239,6 @@ def prepare_dataframe(df):
     y = np.log(y)
 
     return X, y, df
-
-
-
-
-
-# commenting out the below because I don't need every single table
-# I'll come to tables as I need them.
-# For now, I will focus on Per 36 Min table
-
-# def clean_tables(dfs):  # I'll run a for loop for each df in dfs
-#     '''
-#     Takes list of pandas dataframes for an NBA team in 1999 and cleans each
-#     DataFrame
-#     '''
-#     clean_dfs = []
-
-#     # clean df 0
-#     df0 = dfs[0]
-#     df0 = df0.apply(str.strip)  # strip white space from number
-#     clean_dfs.append(df0)
-
-#     # df 1 is already clean
-#     df1 = dfs[1]
-#     df1.columns = ['Name', 'Title']
-#     clean_dfs.append(df1)
-
-#     # clean df 2
-#     df2 = dfs[2]
-#     df2.columns = df2.iloc[0, :]
-#     df2.drop(0, inplace=True)
-#     df2.reset_index(inplace=True, drop=True)
-#     clean_dfs.append(df2)
-
-#     # clean df 3
-#     df3 = dfs[3]
-#     [3].drop(0, inplace=True)
-#     cols = df3.iloc[0, :]
-#     df3.columns = cols
-#     df3.drop(1, inplace=True)
-#     df3.reset_index(inplace=True)
-#     clean_dfs.append(df3)
-
-#     # clean df 4
-
-
 
 
 if __name__ == '__main__':
