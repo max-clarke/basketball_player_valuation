@@ -19,3 +19,10 @@ In `basketball.py` are a collection of functions for retrieving, organizing, and
 In `analysis.ipynb` is some work I did training models and predicting salaries. I determined the most undervalued and most overvalued for each year in my dataset.
 
 In `data/` are several pickled files containing pandas data frames holding the data from basketball-reference. 
+
+### Blogpost
+
+To read more about this project, please read my blogpost about it:
+
+<https://max-clarke.github.io/2019/03/01/Valuing-Basketball-Players/>
+
